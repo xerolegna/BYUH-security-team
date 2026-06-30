@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { mockWorkOrders } from '../data/mockData';
+import { loadWorkOrders, saveWorkOrders } from '../lib/storage';
 import type { WorkOrder, WorkOrderType, WorkOrderStatus, Priority } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -25,7 +25,7 @@ const defaultForm: WorkOrderForm = {
 };
 
 export default function WorkOrdersPage() {
-  const [orders, setOrders] = useState<WorkOrder[]>(mockWorkOrders);
+  const [orders, setOrders] = useState<WorkOrder[]>(loadWorkOrders);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<WorkOrderForm>(defaultForm);
 
@@ -36,13 +36,17 @@ export default function WorkOrdersPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
-    setOrders(prev => [{ id: Date.now(), ...form }, ...prev]);
+    const updated = [{ id: Date.now(), ...form }, ...orders];
+    setOrders(updated);
+    saveWorkOrders(updated);
     setForm(defaultForm);
     setShowForm(false);
   }
 
   function handleDelete(id: number) {
-    setOrders(prev => prev.filter(o => o.id !== id));
+    const updated = orders.filter(o => o.id !== id);
+    setOrders(updated);
+    saveWorkOrders(updated);
   }
 
   return (

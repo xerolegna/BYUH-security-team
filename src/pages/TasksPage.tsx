@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { mockTasks } from '../data/mockData';
+import { loadTasks, saveTasks } from '../lib/storage';
 import type { Task, Priority, TaskStatus } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -25,21 +25,6 @@ const defaultForm: TaskForm = {
   assignedTo: '',
   dueDate: '',
 };
-
-const STORAGE_KEY = 'byuh_tasks';
-
-function loadTasks(): Task[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : mockTasks;
-  } catch {
-    return mockTasks;
-  }
-}
-
-function saveTasks(tasks: Task[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>(loadTasks);

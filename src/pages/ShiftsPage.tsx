@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { mockShifts } from '../data/mockData';
+import { loadShifts, saveShifts } from '../lib/storage';
 import type { Shift } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -23,7 +23,7 @@ const defaultForm: ShiftForm = {
 };
 
 export default function ShiftsPage() {
-  const [shifts, setShifts] = useState<Shift[]>(mockShifts);
+  const [shifts, setShifts] = useState<Shift[]>(loadShifts);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ShiftForm>(defaultForm);
 
@@ -34,13 +34,17 @@ export default function ShiftsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.employeeName.trim()) return;
-    setShifts(prev => [{ id: Date.now(), ...form }, ...prev]);
+    const updated = [{ id: Date.now(), ...form }, ...shifts];
+    setShifts(updated);
+    saveShifts(updated);
     setForm(defaultForm);
     setShowForm(false);
   }
 
   function handleDelete(id: number) {
-    setShifts(prev => prev.filter(s => s.id !== id));
+    const updated = shifts.filter(s => s.id !== id);
+    setShifts(updated);
+    saveShifts(updated);
   }
 
   return (

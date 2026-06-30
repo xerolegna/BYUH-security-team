@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { mockCameras } from '../data/mockData';
+import { loadCameras, saveCameras } from '../lib/storage';
 import type { Camera, CameraStatus } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -23,7 +23,7 @@ const defaultForm: CameraForm = {
 };
 
 export default function CamerasPage() {
-  const [cameras, setCameras] = useState<Camera[]>(mockCameras);
+  const [cameras, setCameras] = useState<Camera[]>(loadCameras);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<CameraForm>(defaultForm);
 
@@ -38,13 +38,17 @@ export default function CamerasPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    setCameras(prev => [{ id: Date.now(), ...form }, ...prev]);
+    const updated = [{ id: Date.now(), ...form }, ...cameras];
+    setCameras(updated);
+    saveCameras(updated);
     setForm(defaultForm);
     setShowForm(false);
   }
 
   function handleDelete(id: number) {
-    setCameras(prev => prev.filter(c => c.id !== id));
+    const updated = cameras.filter(c => c.id !== id);
+    setCameras(updated);
+    saveCameras(updated);
   }
 
   return (

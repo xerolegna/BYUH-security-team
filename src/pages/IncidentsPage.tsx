@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { mockIncidents } from '../data/mockData';
+import { loadIncidents, saveIncidents } from '../lib/storage';
 import type { Incident, Severity, IncidentStatus } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -27,7 +27,7 @@ const defaultForm: IncidentForm = {
 };
 
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>(mockIncidents);
+  const [incidents, setIncidents] = useState<Incident[]>(loadIncidents);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<IncidentForm>(defaultForm);
 
@@ -38,13 +38,17 @@ export default function IncidentsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
-    setIncidents(prev => [{ id: Date.now(), ...form }, ...prev]);
+    const updated = [{ id: Date.now(), ...form }, ...incidents];
+    setIncidents(updated);
+    saveIncidents(updated);
     setForm(defaultForm);
     setShowForm(false);
   }
 
   function handleDelete(id: number) {
-    setIncidents(prev => prev.filter(i => i.id !== id));
+    const updated = incidents.filter(i => i.id !== id);
+    setIncidents(updated);
+    saveIncidents(updated);
   }
 
   return (

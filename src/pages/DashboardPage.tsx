@@ -1,21 +1,27 @@
 import StatCard from '../components/StatCard';
 import Badge from '../components/Badge';
-import { mockTasks, mockIncidents, mockCameras, mockWorkOrders, mockShifts } from '../data/mockData';
+import { loadTasks, loadIncidents, loadCameras, loadWorkOrders, loadShifts } from '../lib/storage';
 
 export default function DashboardPage() {
-  const openIncidents = mockIncidents.filter(i => i.status !== 'Resolved').length;
-  const activeCameras = mockCameras.filter(c => c.status === 'Online').length;
-  const openWorkOrders = mockWorkOrders.filter(w => w.status !== 'Completed').length;
+  const tasks = loadTasks();
+  const incidents = loadIncidents();
+  const cameras = loadCameras();
+  const workOrders = loadWorkOrders();
+  const shifts = loadShifts();
+
+  const openIncidents = incidents.filter(i => i.status !== 'Resolved').length;
+  const activeCameras = cameras.filter(c => c.status === 'Online').length;
+  const openWorkOrders = workOrders.filter(w => w.status !== 'Completed').length;
 
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <StatCard title="Total Tasks" value={mockTasks.length} color="blue" />
+        <StatCard title="Total Tasks" value={tasks.length} color="blue" />
         <StatCard title="Open Incidents" value={openIncidents} color="red" />
         <StatCard title="Active Cameras" value={activeCameras} color="green" />
         <StatCard title="Work Orders" value={openWorkOrders} color="purple" />
-        <StatCard title="Upcoming Shifts" value={mockShifts.length} color="orange" />
+        <StatCard title="Upcoming Shifts" value={shifts.length} color="orange" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -25,7 +31,7 @@ export default function DashboardPage() {
             Recent Incidents
           </h3>
           <div className="space-y-1">
-            {mockIncidents.map(incident => (
+            {incidents.map(incident => (
               <div
                 key={incident.id}
                 className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
@@ -53,7 +59,7 @@ export default function DashboardPage() {
             Task Overview
           </h3>
           <div className="space-y-1">
-            {mockTasks.map(task => (
+            {tasks.map(task => (
               <div
                 key={task.id}
                 className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
@@ -81,7 +87,7 @@ export default function DashboardPage() {
             Camera Status
           </h3>
           <div className="space-y-1">
-            {mockCameras.map(cam => (
+            {cameras.map(cam => (
               <div
                 key={cam.id}
                 className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
@@ -102,7 +108,7 @@ export default function DashboardPage() {
             Upcoming Shifts
           </h3>
           <div className="space-y-1">
-            {mockShifts.map(shift => (
+            {shifts.map(shift => (
               <div
                 key={shift.id}
                 className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
