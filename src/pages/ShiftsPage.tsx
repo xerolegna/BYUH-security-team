@@ -1,49 +1,71 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { fetchShifts, insertShift, deleteShift } from '../lib/db';
+import { Plus, Trash2, Pencil } from 'lucide-react';
+import Modal from '../components/Modal';
+import { fetchShifts, insertShift, updateShift, deleteShift } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Shift } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1';
 
-interface ShiftForm {
-  employeeName: string;
-  role: string;
-  shiftStart: string;
-  shiftEnd: string;
-  location: string;
-}
+interface ShiftForm { employeeName: string; role: string; shiftStart: string; shiftEnd: string; location: string; }
 
-const defaultForm: ShiftForm = {
-  employeeName: '',
-  role: '',
-  shiftStart: '',
-  shiftEnd: '',
-  location: '',
-};
+const defaultForm: ShiftForm = { employeeName: '', role: '', shiftStart: '', shiftEnd: '', location: '' };
+
+function ShiftFormFields({ form, onChange }: { form: ShiftForm; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label className={labelCls}>Employee Name *</label>
+        <input name="employeeName" value={form.employeeName} onChange={onChange} required placeholder="Full name" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Role</label>
+        <input name="role" value={form.role} onChange={onChange} placeholder="e.g. Security Officer" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Shift Start</label>
+        <input type="datetime-local" name="shiftStart" value={form.shiftStart} onChange={onChange} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Shift End</label>
+        <input type="datetime-local" name="shiftEnd" value={form.shiftEnd} onChange={onChange} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Location</label>
+        <input name="location" value={form.location} onChange={onChange} placeholder="e.g. Main Entrance" className={inputCls} />
+      </div>
+    </div>
+  );
+}
 
 export default function ShiftsPage() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ShiftForm>(defaultForm);
+  const [editing, setEditing] = useState<Shift | null>(null);
+  const [editForm, setEditForm] = useState<ShiftForm>(defaultForm);
 
   useEffect(() => {
     fetchShifts().then(setShifts).finally(() => setLoading(false));
-
-    const channel = supabase
-      .channel('shifts-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
-        fetchShifts().then(setShifts);
-      })
+    const channel = supabase.channel('shifts-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => fetchShifts().then(setShifts))
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  function handleEditChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  function openEdit(shift: Shift) {
+    setEditing(shift);
+    setEditForm({ employeeName: shift.employeeName, role: shift.role, shiftStart: shift.shiftStart, shiftEnd: shift.shiftEnd, location: shift.location });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,6 +77,14 @@ export default function ShiftsPage() {
     setShowForm(false);
   }
 
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    const updated = await updateShift(editing.id, editForm);
+    setShifts(prev => prev.map(s => s.id === updated.id ? updated : s));
+    setEditing(null);
+  }
+
   async function handleDelete(id: number) {
     setShifts(prev => prev.filter(s => s.id !== id));
     await deleteShift(id);
@@ -62,44 +92,31 @@ export default function ShiftsPage() {
 
   return (
     <div className="space-y-4">
+      {editing && (
+        <Modal title="Edit Shift" onClose={() => setEditing(null)}>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <ShiftFormFields form={editForm} onChange={handleEditChange} />
+            <div className="flex gap-3 justify-end pt-2">
+              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {loading ? 'Loading…' : `${shifts.length} shift${shifts.length !== 1 ? 's' : ''} scheduled`}
-        </p>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} />
-          Add Shift
+        <p className="text-sm text-gray-500 dark:text-gray-400">{loading ? 'Loading…' : `${shifts.length} shift${shifts.length !== 1 ? 's' : ''} scheduled`}</p>
+        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+          <Plus size={16} /> Add Shift
         </button>
       </div>
 
       {showForm && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Schedule Shift</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Employee Name *</label>
-              <input name="employeeName" value={form.employeeName} onChange={handleChange} required placeholder="Full name" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Role</label>
-              <input name="role" value={form.role} onChange={handleChange} placeholder="e.g. Security Officer" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Shift Start</label>
-              <input type="datetime-local" name="shiftStart" value={form.shiftStart} onChange={handleChange} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Shift End</label>
-              <input type="datetime-local" name="shiftEnd" value={form.shiftEnd} onChange={handleChange} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Location</label>
-              <input name="location" value={form.location} onChange={handleChange} placeholder="e.g. Main Entrance" className={inputCls} />
-            </div>
-            <div className="sm:col-span-2 flex gap-3 justify-end">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <ShiftFormFields form={form} onChange={handleChange} />
+            <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => { setShowForm(false); setForm(defaultForm); }} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Schedule</button>
             </div>
@@ -120,12 +137,8 @@ export default function ShiftsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">Loading…</td></tr>
-            )}
-            {!loading && shifts.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No shifts scheduled.</td></tr>
-            )}
+            {loading && <tr><td colSpan={6} className="text-center py-10 text-gray-400 text-sm">Loading…</td></tr>}
+            {!loading && shifts.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-gray-400 text-sm">No shifts scheduled.</td></tr>}
             {shifts.map(shift => (
               <tr key={shift.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{shift.employeeName}</td>
@@ -134,7 +147,10 @@ export default function ShiftsPage() {
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{shift.shiftEnd}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{shift.location}</td>
                 <td className="px-4 py-3">
-                  <button onClick={() => handleDelete(shift.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => openEdit(shift)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
+                    <button onClick={() => handleDelete(shift.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                  </div>
                 </td>
               </tr>
             ))}

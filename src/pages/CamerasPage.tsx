@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import Badge from '../components/Badge';
-import { fetchCameras, insertCamera, deleteCamera } from '../lib/db';
+import Modal from '../components/Modal';
+import { fetchCameras, insertCamera, updateCamera, deleteCamera } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Camera, CameraStatus } from '../types';
 
@@ -9,25 +10,42 @@ const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg 
 const selectCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1';
 
-interface CameraForm {
-  name: string;
-  location: string;
-  status: CameraStatus;
-  lastChecked: string;
-}
+interface CameraForm { name: string; location: string; status: CameraStatus; lastChecked: string; }
 
-const defaultForm: CameraForm = {
-  name: '',
-  location: '',
-  status: 'Online',
-  lastChecked: new Date().toISOString().split('T')[0],
-};
+const defaultForm: CameraForm = { name: '', location: '', status: 'Online', lastChecked: new Date().toISOString().split('T')[0] };
+
+function CameraFormFields({ form, onChange }: { form: CameraForm; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label className={labelCls}>Camera Name *</label>
+        <input name="name" value={form.name} onChange={onChange} required placeholder="e.g. CAM-07" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Location</label>
+        <input name="location" value={form.location} onChange={onChange} placeholder="e.g. South Parking Lot" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Status</label>
+        <select name="status" value={form.status} onChange={onChange} className={selectCls}>
+          <option>Online</option><option>Offline</option><option>Maintenance</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Last Checked</label>
+        <input type="date" name="lastChecked" value={form.lastChecked} onChange={onChange} className={inputCls} />
+      </div>
+    </div>
+  );
+}
 
 export default function CamerasPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<CameraForm>(defaultForm);
+  const [editing, setEditing] = useState<Camera | null>(null);
+  const [editForm, setEditForm] = useState<CameraForm>(defaultForm);
 
   const online = cameras.filter(c => c.status === 'Online').length;
   const offline = cameras.filter(c => c.status === 'Offline').length;
@@ -35,14 +53,9 @@ export default function CamerasPage() {
 
   useEffect(() => {
     fetchCameras().then(setCameras).finally(() => setLoading(false));
-
-    const channel = supabase
-      .channel('cameras-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cameras' }, () => {
-        fetchCameras().then(setCameras);
-      })
+    const channel = supabase.channel('cameras-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cameras' }, () => fetchCameras().then(setCameras))
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -50,13 +63,30 @@ export default function CamerasPage() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value } as CameraForm));
   }
 
+  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value } as CameraForm));
+  }
+
+  function openEdit(cam: Camera) {
+    setEditing(cam);
+    setEditForm({ name: cam.name, location: cam.location, status: cam.status, lastChecked: cam.lastChecked });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    const newCamera = await insertCamera(form);
-    setCameras(prev => [newCamera, ...prev]);
+    const newCam = await insertCamera(form);
+    setCameras(prev => [newCam, ...prev]);
     setForm(defaultForm);
     setShowForm(false);
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    const updated = await updateCamera(editing.id, editForm);
+    setCameras(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setEditing(null);
   }
 
   async function handleDelete(id: number) {
@@ -66,43 +96,34 @@ export default function CamerasPage() {
 
   return (
     <div className="space-y-4">
+      {editing && (
+        <Modal title="Edit Camera" onClose={() => setEditing(null)}>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <CameraFormFields form={editForm} onChange={handleEditChange} />
+            <div className="flex gap-3 justify-end pt-2">
+              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-3 py-1 rounded-full text-sm font-medium">{online} Online</span>
         <span className="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 px-3 py-1 rounded-full text-sm font-medium">{offline} Offline</span>
         <span className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-3 py-1 rounded-full text-sm font-medium">{maintenance} Maintenance</span>
         <div className="flex-1" />
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} />
-          Add Camera
+        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+          <Plus size={16} /> Add Camera
         </button>
       </div>
 
       {showForm && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Register Camera</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Camera Name *</label>
-              <input name="name" value={form.name} onChange={handleChange} required placeholder="e.g. CAM-07" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Location</label>
-              <input name="location" value={form.location} onChange={handleChange} placeholder="e.g. South Parking Lot" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Status</label>
-              <select name="status" value={form.status} onChange={handleChange} className={selectCls}>
-                <option>Online</option><option>Offline</option><option>Maintenance</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Last Checked</label>
-              <input type="date" name="lastChecked" value={form.lastChecked} onChange={handleChange} className={inputCls} />
-            </div>
-            <div className="sm:col-span-2 flex gap-3 justify-end">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <CameraFormFields form={form} onChange={handleChange} />
+            <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => { setShowForm(false); setForm(defaultForm); }} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Register</button>
             </div>
@@ -122,12 +143,8 @@ export default function CamerasPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan={5} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">Loading…</td></tr>
-            )}
-            {!loading && cameras.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No cameras registered.</td></tr>
-            )}
+            {loading && <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Loading…</td></tr>}
+            {!loading && cameras.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">No cameras registered.</td></tr>}
             {cameras.map(cam => (
               <tr key={cam.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{cam.name}</td>
@@ -135,7 +152,10 @@ export default function CamerasPage() {
                 <td className="px-4 py-3"><Badge value={cam.status} /></td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{cam.lastChecked}</td>
                 <td className="px-4 py-3">
-                  <button onClick={() => handleDelete(cam.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => openEdit(cam)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
+                    <button onClick={() => handleDelete(cam.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                  </div>
                 </td>
               </tr>
             ))}

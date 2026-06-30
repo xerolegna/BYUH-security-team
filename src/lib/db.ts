@@ -45,6 +45,15 @@ export async function insertTask(task: Omit<Task, 'id'>): Promise<Task> {
   };
 }
 
+export async function updateTask(id: number, task: Omit<Task, 'id'>): Promise<Task> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ title: task.title, description: task.description, priority: task.priority, status: task.status, assigned_to: task.assignedTo, due_date: task.dueDate })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  return { id: data.id, title: data.title, description: data.description ?? '', priority: data.priority, status: data.status, assignedTo: data.assigned_to ?? '', dueDate: data.due_date ?? '' };
+}
+
 export async function deleteTask(id: number): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) throw error;
@@ -94,6 +103,15 @@ export async function insertIncident(incident: Omit<Incident, 'id'>): Promise<In
   };
 }
 
+export async function updateIncident(id: number, incident: Omit<Incident, 'id'>): Promise<Incident> {
+  const { data, error } = await supabase
+    .from('incidents')
+    .update({ title: incident.title, location: incident.location, severity: incident.severity, description: incident.description, status: incident.status, date_reported: incident.dateReported })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  return { id: data.id, title: data.title, location: data.location ?? '', severity: data.severity, description: data.description ?? '', status: data.status, dateReported: data.date_reported ?? '' };
+}
+
 export async function deleteIncident(id: number): Promise<void> {
   const { error } = await supabase.from('incidents').delete().eq('id', id);
   if (error) throw error;
@@ -135,6 +153,15 @@ export async function insertCamera(camera: Omit<Camera, 'id'>): Promise<Camera> 
     status: data.status,
     lastChecked: data.last_checked ?? '',
   };
+}
+
+export async function updateCamera(id: number, camera: Omit<Camera, 'id'>): Promise<Camera> {
+  const { data, error } = await supabase
+    .from('cameras')
+    .update({ name: camera.name, location: camera.location, status: camera.status, last_checked: camera.lastChecked })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  return { id: data.id, name: data.name, location: data.location ?? '', status: data.status, lastChecked: data.last_checked ?? '' };
 }
 
 export async function deleteCamera(id: number): Promise<void> {
@@ -183,6 +210,15 @@ export async function insertWorkOrder(order: Omit<WorkOrder, 'id'>): Promise<Wor
   };
 }
 
+export async function updateWorkOrder(id: number, order: Omit<WorkOrder, 'id'>): Promise<WorkOrder> {
+  const { data, error } = await supabase
+    .from('work_orders')
+    .update({ title: order.title, type: order.type, priority: order.priority, status: order.status, assigned_to: order.assignedTo })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  return { id: data.id, title: data.title, type: data.type, priority: data.priority, status: data.status, assignedTo: data.assigned_to ?? '' };
+}
+
 export async function deleteWorkOrder(id: number): Promise<void> {
   const { error } = await supabase.from('work_orders').delete().eq('id', id);
   if (error) throw error;
@@ -227,6 +263,15 @@ export async function insertShift(shift: Omit<Shift, 'id'>): Promise<Shift> {
     shiftEnd: data.shift_end ?? '',
     location: data.location ?? '',
   };
+}
+
+export async function updateShift(id: number, shift: Omit<Shift, 'id'>): Promise<Shift> {
+  const { data, error } = await supabase
+    .from('shifts')
+    .update({ employee_name: shift.employeeName, role: shift.role, shift_start: shift.shiftStart, shift_end: shift.shiftEnd, location: shift.location })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  return { id: data.id, employeeName: data.employee_name, role: data.role ?? '', shiftStart: data.shift_start ?? '', shiftEnd: data.shift_end ?? '', location: data.location ?? '' };
 }
 
 export async function deleteShift(id: number): Promise<void> {
