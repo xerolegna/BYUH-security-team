@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { loadWorkOrders, saveWorkOrders } from '../lib/storage';
+import { fetchWorkOrders, insertWorkOrder, deleteWorkOrder } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import type { WorkOrder, WorkOrderType, WorkOrderStatus, Priority } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -25,35 +26,47 @@ const defaultForm: WorkOrderForm = {
 };
 
 export default function WorkOrdersPage() {
-  const [orders, setOrders] = useState<WorkOrder[]>(loadWorkOrders);
+  const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<WorkOrderForm>(defaultForm);
+
+  useEffect(() => {
+    fetchWorkOrders().then(setOrders).finally(() => setLoading(false));
+
+    const channel = supabase
+      .channel('work-orders-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => {
+        fetchWorkOrders().then(setOrders);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value } as WorkOrderForm));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
-    const updated = [{ id: Date.now(), ...form }, ...orders];
-    setOrders(updated);
-    saveWorkOrders(updated);
+    const newOrder = await insertWorkOrder(form);
+    setOrders(prev => [newOrder, ...prev]);
     setForm(defaultForm);
     setShowForm(false);
   }
 
-  function handleDelete(id: number) {
-    const updated = orders.filter(o => o.id !== id);
-    setOrders(updated);
-    saveWorkOrders(updated);
+  async function handleDelete(id: number) {
+    setOrders(prev => prev.filter(o => o.id !== id));
+    await deleteWorkOrder(id);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {orders.length} work order{orders.length !== 1 ? 's' : ''}
+          {loading ? 'Loading…' : `${orders.length} work order${orders.length !== 1 ? 's' : ''}`}
         </p>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -115,7 +128,10 @@ export default function WorkOrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {orders.length === 0 && (
+            {loading && (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">Loading…</td></tr>
+            )}
+            {!loading && orders.length === 0 && (
               <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No work orders yet.</td></tr>
             )}
             {orders.map(order => (

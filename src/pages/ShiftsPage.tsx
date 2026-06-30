@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { loadShifts, saveShifts } from '../lib/storage';
+import { fetchShifts, insertShift, deleteShift } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import type { Shift } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -23,35 +24,47 @@ const defaultForm: ShiftForm = {
 };
 
 export default function ShiftsPage() {
-  const [shifts, setShifts] = useState<Shift[]>(loadShifts);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ShiftForm>(defaultForm);
+
+  useEffect(() => {
+    fetchShifts().then(setShifts).finally(() => setLoading(false));
+
+    const channel = supabase
+      .channel('shifts-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+        fetchShifts().then(setShifts);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.employeeName.trim()) return;
-    const updated = [{ id: Date.now(), ...form }, ...shifts];
-    setShifts(updated);
-    saveShifts(updated);
+    const newShift = await insertShift(form);
+    setShifts(prev => [newShift, ...prev]);
     setForm(defaultForm);
     setShowForm(false);
   }
 
-  function handleDelete(id: number) {
-    const updated = shifts.filter(s => s.id !== id);
-    setShifts(updated);
-    saveShifts(updated);
+  async function handleDelete(id: number) {
+    setShifts(prev => prev.filter(s => s.id !== id));
+    await deleteShift(id);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {shifts.length} shift{shifts.length !== 1 ? 's' : ''} scheduled
+          {loading ? 'Loading…' : `${shifts.length} shift${shifts.length !== 1 ? 's' : ''} scheduled`}
         </p>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -107,7 +120,10 @@ export default function ShiftsPage() {
             </tr>
           </thead>
           <tbody>
-            {shifts.length === 0 && (
+            {loading && (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">Loading…</td></tr>
+            )}
+            {!loading && shifts.length === 0 && (
               <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No shifts scheduled.</td></tr>
             )}
             {shifts.map(shift => (

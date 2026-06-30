@@ -1,13 +1,34 @@
+import { useState, useEffect } from 'react';
 import StatCard from '../components/StatCard';
 import Badge from '../components/Badge';
-import { loadTasks, loadIncidents, loadCameras, loadWorkOrders, loadShifts } from '../lib/storage';
+import { fetchTasks, fetchIncidents, fetchCameras, fetchWorkOrders, fetchShifts } from '../lib/db';
+import { supabase } from '../lib/supabase';
+import type { Task, Incident, Camera, WorkOrder, Shift } from '../types';
 
 export default function DashboardPage() {
-  const tasks = loadTasks();
-  const incidents = loadIncidents();
-  const cameras = loadCameras();
-  const workOrders = loadWorkOrders();
-  const shifts = loadShifts();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+
+  useEffect(() => {
+    fetchTasks().then(setTasks);
+    fetchIncidents().then(setIncidents);
+    fetchCameras().then(setCameras);
+    fetchWorkOrders().then(setWorkOrders);
+    fetchShifts().then(setShifts);
+
+    const channels = [
+      supabase.channel('dash-tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks().then(setTasks)).subscribe(),
+      supabase.channel('dash-incidents').on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => fetchIncidents().then(setIncidents)).subscribe(),
+      supabase.channel('dash-cameras').on('postgres_changes', { event: '*', schema: 'public', table: 'cameras' }, () => fetchCameras().then(setCameras)).subscribe(),
+      supabase.channel('dash-work-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => fetchWorkOrders().then(setWorkOrders)).subscribe(),
+      supabase.channel('dash-shifts').on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => fetchShifts().then(setShifts)).subscribe(),
+    ];
+
+    return () => { channels.forEach(c => supabase.removeChannel(c)); };
+  }, []);
 
   const openIncidents = incidents.filter(i => i.status !== 'Resolved').length;
   const activeCameras = cameras.filter(c => c.status === 'Online').length;
@@ -15,7 +36,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCard title="Total Tasks" value={tasks.length} color="blue" />
         <StatCard title="Open Incidents" value={openIncidents} color="red" />
@@ -25,24 +45,15 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Recent Incidents */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            Recent Incidents
-          </h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Recent Incidents</h3>
           <div className="space-y-1">
+            {incidents.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">No incidents.</p>}
             {incidents.map(incident => (
-              <div
-                key={incident.id}
-                className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
-              >
+              <div key={incident.id} className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
                 <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                    {incident.title}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {incident.location} &mdash; {incident.dateReported}
-                  </p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{incident.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{incident.location} &mdash; {incident.dateReported}</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 shrink-0">
                   <Badge value={incident.severity} />
@@ -53,24 +64,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Task Overview */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            Task Overview
-          </h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Task Overview</h3>
           <div className="space-y-1">
+            {tasks.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">No tasks.</p>}
             {tasks.map(task => (
-              <div
-                key={task.id}
-                className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
-              >
+              <div key={task.id} className="flex items-start justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
                 <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                    {task.title}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {task.assignedTo} &mdash; Due {task.dueDate}
-                  </p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{task.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{task.assignedTo} &mdash; Due {task.dueDate}</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 shrink-0">
                   <Badge value={task.priority} />
@@ -81,17 +83,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Camera Status */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            Camera Status
-          </h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Camera Status</h3>
           <div className="space-y-1">
+            {cameras.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">No cameras.</p>}
             {cameras.map(cam => (
-              <div
-                key={cam.id}
-                className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
-              >
+              <div key={cam.id} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
                 <div>
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{cam.name}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{cam.location}</p>
@@ -102,28 +99,17 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Upcoming Shifts */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            Upcoming Shifts
-          </h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Upcoming Shifts</h3>
           <div className="space-y-1">
+            {shifts.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">No shifts scheduled.</p>}
             {shifts.map(shift => (
-              <div
-                key={shift.id}
-                className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
-              >
+              <div key={shift.id} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                    {shift.employeeName}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {shift.role} &mdash; {shift.location}
-                  </p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{shift.employeeName}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{shift.role} &mdash; {shift.location}</p>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                  {shift.shiftStart}<br />→ {shift.shiftEnd}
-                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-right">{shift.shiftStart}<br />→ {shift.shiftEnd}</p>
               </div>
             ))}
           </div>

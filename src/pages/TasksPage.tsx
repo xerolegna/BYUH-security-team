@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Badge from '../components/Badge';
-import { loadTasks, saveTasks } from '../lib/storage';
+import { fetchTasks, insertTask, deleteTask } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import type { Task, Priority, TaskStatus } from '../types';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -27,35 +28,47 @@ const defaultForm: TaskForm = {
 };
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(loadTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<TaskForm>(defaultForm);
+
+  useEffect(() => {
+    fetchTasks().then(setTasks).finally(() => setLoading(false));
+
+    const channel = supabase
+      .channel('tasks-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchTasks().then(setTasks);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value } as TaskForm));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
-    const updated = [{ id: Date.now(), ...form }, ...tasks];
-    setTasks(updated);
-    saveTasks(updated);
+    const newTask = await insertTask(form);
+    setTasks(prev => [newTask, ...prev]);
     setForm(defaultForm);
     setShowForm(false);
   }
 
-  function handleDelete(id: number) {
-    const updated = tasks.filter(t => t.id !== id);
-    setTasks(updated);
-    saveTasks(updated);
+  async function handleDelete(id: number) {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    await deleteTask(id);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+          {loading ? 'Loading…' : `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
         </p>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -123,7 +136,10 @@ export default function TasksPage() {
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 && (
+            {loading && (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">Loading…</td></tr>
+            )}
+            {!loading && tasks.length === 0 && (
               <tr><td colSpan={6} className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No tasks yet. Click "Add Task" to get started.</td></tr>
             )}
             {tasks.map(task => (
