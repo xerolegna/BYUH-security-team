@@ -8,7 +8,6 @@ import CamerasPage from '../pages/CamerasPage';
 import WorkOrdersPage from '../pages/WorkOrdersPage';
 import ShiftsPage from '../pages/ShiftsPage';
 import LoginPage from '../pages/LoginPage';
-import SignupPage from '../pages/SignupPage';
 
 function ProtectedRoute() {
   const { isLoggedIn } = useAuth();
@@ -20,7 +19,7 @@ export default function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/signup" element={<Navigate to="/login" replace />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<AppLayout />}>

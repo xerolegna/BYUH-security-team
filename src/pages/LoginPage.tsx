@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -54,12 +54,6 @@ export default function LoginPage() {
               Sign In
             </button>
           </form>
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-5">
-            Don&apos;t have an account?{' '}
-            <Link to="/signup" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
-              Sign up
-            </Link>
-          </p>
         </div>
       </div>
     </div>

@@ -1,50 +1,30 @@
 import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 
-interface User {
-  username: string;
-  password: string;
-}
-
 interface AuthContextType {
   isLoggedIn: boolean;
   currentUser: string | null;
   login: (username: string, password: string) => { success: boolean; message: string };
-  signup: (username: string, password: string) => { success: boolean; message: string };
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const VALID_USERNAME = 'Security';
+const VALID_PASSWORD = 'Seasider2026';
 
-function getUsers(): User[] {
-  try {
-    return JSON.parse(localStorage.getItem('byuh_users') ?? '[]') as User[];
-  } catch {
-    return [];
-  }
-}
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('byuh_auth') === 'true');
   const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('byuh_user'));
 
   function login(username: string, password: string) {
-    const users = getUsers();
-    const match = users.find(u => u.username === username && u.password === password);
-    if (!match) return { success: false, message: 'Invalid username or password.' };
+    if (username !== VALID_USERNAME || password !== VALID_PASSWORD) {
+      return { success: false, message: 'Invalid username or password.' };
+    }
     localStorage.setItem('byuh_auth', 'true');
     localStorage.setItem('byuh_user', username);
     setIsLoggedIn(true);
     setCurrentUser(username);
-    return { success: true, message: '' };
-  }
-
-  function signup(username: string, password: string) {
-    const users = getUsers();
-    if (users.find(u => u.username === username)) {
-      return { success: false, message: 'Username already taken.' };
-    }
-    localStorage.setItem('byuh_users', JSON.stringify([...users, { username, password }]));
     return { success: true, message: '' };
   }
 
@@ -56,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, currentUser, login, signup, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, currentUser, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
