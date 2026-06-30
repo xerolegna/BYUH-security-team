@@ -26,8 +26,23 @@ const defaultForm: TaskForm = {
   dueDate: '',
 };
 
+const STORAGE_KEY = 'byuh_tasks';
+
+function loadTasks(): Task[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : mockTasks;
+  } catch {
+    return mockTasks;
+  }
+}
+
+function saveTasks(tasks: Task[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>(loadTasks);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<TaskForm>(defaultForm);
 
@@ -38,13 +53,17 @@ export default function TasksPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
-    setTasks(prev => [{ id: Date.now(), ...form }, ...prev]);
+    const updated = [{ id: Date.now(), ...form }, ...tasks];
+    setTasks(updated);
+    saveTasks(updated);
     setForm(defaultForm);
     setShowForm(false);
   }
 
   function handleDelete(id: number) {
-    setTasks(prev => prev.filter(t => t.id !== id));
+    const updated = tasks.filter(t => t.id !== id);
+    setTasks(updated);
+    saveTasks(updated);
   }
 
   return (
