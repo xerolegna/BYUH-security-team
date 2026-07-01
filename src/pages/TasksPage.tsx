@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchTasks, insertTask, updateTask, deleteTask } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Task, Priority, TaskStatus } from '../types';
@@ -56,6 +57,7 @@ export default function TasksPage() {
   const [form, setForm] = useState<TaskForm>(defaultForm);
   const [editing, setEditing] = useState<Task | null>(null);
   const [editForm, setEditForm] = useState<TaskForm>(defaultForm);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTasks().then(setTasks).finally(() => setLoading(false));
@@ -95,13 +97,23 @@ export default function TasksPage() {
     setEditing(null);
   }
 
-  async function handleDelete(id: number) {
-    setTasks(prev => prev.filter(t => t.id !== id));
-    await deleteTask(id);
+  async function handleDelete() {
+    if (pendingDelete === null) return;
+    setTasks(prev => prev.filter(t => t.id !== pendingDelete));
+    await deleteTask(pendingDelete);
+    setPendingDelete(null);
   }
 
   return (
     <div className="space-y-4">
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this task?"
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {editing && (
         <Modal title="Edit Task" onClose={() => setEditing(null)}>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -162,7 +174,7 @@ export default function TasksPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
                     <button onClick={() => openEdit(task)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                    <button onClick={() => setPendingDelete(task.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>

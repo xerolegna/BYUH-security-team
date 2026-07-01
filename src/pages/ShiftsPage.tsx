@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchShifts, insertShift, updateShift, deleteShift } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Shift } from '../types';
@@ -46,6 +47,7 @@ export default function ShiftsPage() {
   const [form, setForm] = useState<ShiftForm>(defaultForm);
   const [editing, setEditing] = useState<Shift | null>(null);
   const [editForm, setEditForm] = useState<ShiftForm>(defaultForm);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   useEffect(() => {
     fetchShifts().then(setShifts).finally(() => setLoading(false));
@@ -85,13 +87,23 @@ export default function ShiftsPage() {
     setEditing(null);
   }
 
-  async function handleDelete(id: number) {
-    setShifts(prev => prev.filter(s => s.id !== id));
-    await deleteShift(id);
+  async function handleDelete() {
+    if (pendingDelete === null) return;
+    setShifts(prev => prev.filter(s => s.id !== pendingDelete));
+    await deleteShift(pendingDelete);
+    setPendingDelete(null);
   }
 
   return (
     <div className="space-y-4">
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this shift?"
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {editing && (
         <Modal title="Edit Shift" onClose={() => setEditing(null)}>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -149,7 +161,7 @@ export default function ShiftsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
                     <button onClick={() => openEdit(shift)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(shift.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                    <button onClick={() => setPendingDelete(shift.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>

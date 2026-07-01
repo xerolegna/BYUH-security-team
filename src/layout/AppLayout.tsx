@@ -33,6 +33,9 @@ export default function AppLayout() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
+        <footer className="shrink-0 border-t border-gray-200 dark:border-gray-700 py-3 px-6 text-center text-xs text-gray-400 dark:text-gray-500">
+          BYUH Security IT Dashboard
+        </footer>
       </div>
     </div>
   );

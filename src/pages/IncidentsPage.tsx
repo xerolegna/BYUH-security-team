@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchIncidents, insertIncident, updateIncident, deleteIncident } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Incident, Severity, IncidentStatus } from '../types';
@@ -56,6 +57,7 @@ export default function IncidentsPage() {
   const [form, setForm] = useState<IncidentForm>(defaultForm);
   const [editing, setEditing] = useState<Incident | null>(null);
   const [editForm, setEditForm] = useState<IncidentForm>(defaultForm);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   useEffect(() => {
     fetchIncidents().then(setIncidents).finally(() => setLoading(false));
@@ -95,13 +97,23 @@ export default function IncidentsPage() {
     setEditing(null);
   }
 
-  async function handleDelete(id: number) {
-    setIncidents(prev => prev.filter(i => i.id !== id));
-    await deleteIncident(id);
+  async function handleDelete() {
+    if (pendingDelete === null) return;
+    setIncidents(prev => prev.filter(i => i.id !== pendingDelete));
+    await deleteIncident(pendingDelete);
+    setPendingDelete(null);
   }
 
   return (
     <div className="space-y-4">
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this incident?"
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {editing && (
         <Modal title="Edit Incident" onClose={() => setEditing(null)}>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -162,7 +174,7 @@ export default function IncidentsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
                     <button onClick={() => openEdit(incident)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(incident.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                    <button onClick={() => setPendingDelete(incident.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>

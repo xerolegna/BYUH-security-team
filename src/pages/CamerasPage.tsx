@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchCameras, insertCamera, updateCamera, deleteCamera } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { Camera, CameraStatus } from '../types';
@@ -46,6 +47,7 @@ export default function CamerasPage() {
   const [form, setForm] = useState<CameraForm>(defaultForm);
   const [editing, setEditing] = useState<Camera | null>(null);
   const [editForm, setEditForm] = useState<CameraForm>(defaultForm);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   const online = cameras.filter(c => c.status === 'Online').length;
   const offline = cameras.filter(c => c.status === 'Offline').length;
@@ -89,13 +91,23 @@ export default function CamerasPage() {
     setEditing(null);
   }
 
-  async function handleDelete(id: number) {
-    setCameras(prev => prev.filter(c => c.id !== id));
-    await deleteCamera(id);
+  async function handleDelete() {
+    if (pendingDelete === null) return;
+    setCameras(prev => prev.filter(c => c.id !== pendingDelete));
+    await deleteCamera(pendingDelete);
+    setPendingDelete(null);
   }
 
   return (
     <div className="space-y-4">
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this camera?"
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {editing && (
         <Modal title="Edit Camera" onClose={() => setEditing(null)}>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -154,7 +166,7 @@ export default function CamerasPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
                     <button onClick={() => openEdit(cam)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(cam.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                    <button onClick={() => setPendingDelete(cam.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchWorkOrders, insertWorkOrder, updateWorkOrder, deleteWorkOrder } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import type { WorkOrder, WorkOrderType, WorkOrderStatus, Priority } from '../types';
@@ -54,6 +55,7 @@ export default function WorkOrdersPage() {
   const [form, setForm] = useState<WorkOrderForm>(defaultForm);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [editForm, setEditForm] = useState<WorkOrderForm>(defaultForm);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   useEffect(() => {
     fetchWorkOrders().then(setOrders).finally(() => setLoading(false));
@@ -93,13 +95,23 @@ export default function WorkOrdersPage() {
     setEditing(null);
   }
 
-  async function handleDelete(id: number) {
-    setOrders(prev => prev.filter(o => o.id !== id));
-    await deleteWorkOrder(id);
+  async function handleDelete() {
+    if (pendingDelete === null) return;
+    setOrders(prev => prev.filter(o => o.id !== pendingDelete));
+    await deleteWorkOrder(pendingDelete);
+    setPendingDelete(null);
   }
 
   return (
     <div className="space-y-4">
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this work order?"
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {editing && (
         <Modal title="Edit Work Order" onClose={() => setEditing(null)}>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -157,7 +169,7 @@ export default function WorkOrdersPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
                     <button onClick={() => openEdit(order)} className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(order.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+                    <button onClick={() => setPendingDelete(order.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>
